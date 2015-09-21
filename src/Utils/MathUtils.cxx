@@ -105,4 +105,51 @@ double genie::utils::math::NonNegative(float x)
   return TMath::Max( (float)0., x);
 }
 //____________________________________________________________________________
+double genie::utils::math::Skellam(double mean1, double mean2, int k)
+{
+  // Calculates the probability of k from the Skellam distribution,
+  // which is the difference between two Poisson distributions 
+  // with means of mean1 and mean2. 
 
+  double BesselI, result;
+
+  if(mean1 >= 1e-6 && mean2 >= 1e-6)
+    {
+      //first calculate BesselI (this is modified Bessel function of the first kind)
+      BesselI = 0.0;
+      //sum converges after ~10 terms; use 30 terms to be on the safe side
+      for(int n=0; n<30; n++)
+        {
+          if(n>=0 && n+k>=0)
+            BesselI += (1.0 / (TMath::Factorial(n) * TMath::Factorial(n+k))) * pow(sqrt(mean1 * mean2), 2*n+k);
+        }
+      //exponent in pow term MUST be "0.5*k" 
+      //if it is "k/2", it is rounded down to an int when k is an odd integer, e.g. 5/2 becomes 2 and not 2.5
+      result = exp(-(mean1 + mean2)) * pow((mean1 / mean2), 0.5 * k) * BesselI;
+    }
+  else if(mean1 >= 1e-6 && mean2 < 1e-6 && mean2 >= 0)
+    {
+      //if mean2 is very small, k can only be >= 0; Skellam is effectively a Poisson with mean of mean1
+      if(k>=0)
+        result = exp(-mean1) * pow(mean1, k) / TMath::Factorial(k);
+      else
+        result = 0.0;
+    }
+  else if(mean1 < 1e-6 && mean1 >= 0 && mean2 > 1e-6)
+    {
+      //if mean1 is very small, k can only be <= 0; take k to be the negative of a Poisson with mean of mean2
+      if(k<=0)
+        result = exp(-mean2) * pow(mean2, -k) / TMath::Factorial(-k);
+      else
+        result = 0.0;
+    }
+  else
+    {
+      //LOG("Math", pINFO) "At least one of Mean1 and mean2 is zero or negative; the Skellam probability cannot be calculated.";
+      std::cerr<<"At least one of Mean1 (= "<< mean1<<") and mean2 (= "<<mean2<<") is zero or negative; the Skellam probability cannot be calculated."<<std::endl;
+      exit(1);
+    }
+
+  return result;
+}
+//____________________________________________________________________________

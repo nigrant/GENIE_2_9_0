@@ -39,6 +39,7 @@ namespace math
   bool   IsWithinLimits (int    i, Range1I_t range);
   double NonNegative    (double x);
   double NonNegative    (float  x);
+  double Skellam        (double mean1, double mean2, int k);
 
 } // math  namespace
 } // utils namespace
