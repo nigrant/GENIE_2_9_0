@@ -72,6 +72,7 @@
 #include "PDG/PDGUtils.h"
 #include "Utils/PrintUtils.h"
 #include "Utils/NuclearUtils.h"
+#include "Utils/MathUtils.h"
 
 using std::ostringstream;
 
@@ -932,6 +933,8 @@ void HAIntranuke::Inelastic(
 
 	  double ns0=0; // mean - sum of nucleons
 	  double nd0=0; // mean - difference of nucleons
+	  double np0=0; // nominal number of protons ejected - used for Skellam probability
+          double nn0=0; // nominal number of neutrons ejected - used for Skellam probability
 	  double Sig_ns=0; // std dev - sum
 	  double Sig_nd=0; // std dev - diff
       double gam_ns=0; // exponential decay rate (for nucleons)
@@ -988,6 +991,14 @@ void HAIntranuke::Inelastic(
       if (pdgc==kPdgPi0 || pdgc==kPdgNeutron) nd0-=2.;
       if (pdgc==kPdgPiM)                      nd0-=4.;
 
+      // Calculate nominal np and nominal nn, which are used to calculate the Skellam probability for nd.
+      // The Skellam probability is not defined if np0 or nn0 are <=0.
+      // Set them to be at least +1.01e-6 to avoid exit() in Skellam method.
+      np0 = 0.5 * (ns0 + nd0);
+      np0 = TMath::Max(np0, 1.01e-6);
+      nn0 = 0.5 * (ns0 - nd0);
+      nn0 = TMath::Max(nn0, 1.01e-6);
+
       int iter=0;    // counter
       int np=0,nn=0; // # of p, # of n
       bool not_done=true;
@@ -1018,7 +1029,8 @@ void HAIntranuke::Inelastic(
 	  if (u2==0) u2 = rnd->RndFsi().Rndm(); // Just in case
 
 	  // normally distributed random variable   
-	  double x2 = TMath::Sqrt(-2*TMath::Log(u1))*TMath::Sin(2*kPi*u2);
+	  // Uncomment next line if you want to set nd to random variable drawn from Gaussian distribution.
+	  //double x2 = TMath::Sqrt(-2*TMath::Log(u1))*TMath::Sin(2*kPi*u2);
 
 	  double ns = 0;
 
@@ -1066,7 +1078,12 @@ void HAIntranuke::Inelastic(
 		  if (u2==0) u2 = rnd->RndFsi().Rndm();
 		  x1 = TMath::Sqrt(-2*TMath::Log(u1))*TMath::Cos(2*kPi*u2);  
 
-		  ns = ns0 + Sig_ns * x1;
+		  //Uncomment one of the next 2 lines to set ns to random number drawn from either Gaussian or Poisson distribution
+		  //Set ns equal to random number drawn from Gaussian distribution with mean ns0 and sigma Sig_ns
+		  //ns = ns0 + Sig_ns * x1;
+		  //Set ns equal to random number thrown from Poisson distribution with mean ns0
+                  ns = rnd->RndFsi().Poisson(ns0);
+
 		  if ( ns>max || ns<0 )                  {iter2++; continue;}
 		  else if ( rnd->RndFsi().Rndm() > (ns/max) ) {iter2++; continue;}
 		  else {
@@ -1076,7 +1093,24 @@ void HAIntranuke::Inelastic(
 		} //while(not_found)
 	    }//else pion
 
-	  double nd = nd0 + Sig_nd * x2; // difference (p-n) for both pion, nucleon probe
+	  //Set nd equal to random number drawn from Gaussian distribution with mean nd0 and sigma Sig_nd
+	  //double nd = nd0 + Sig_nd * x2; // difference (p-n) for both pion, nucleon probe
+	  
+	  //Set nd equal to random number thrown from Skellam distribution with input means np0 and nn0.
+          //Do this by throwing a uniform random number between 0 and 1 (u1). 
+          //Then calculate cumulative Skellam probability, and choose value of nd where this cumulative
+          //probability is < u1 for nd and > u1 for nd+1.
+          u1 = rnd->RndFsi().Rndm();
+          double Skellam_cumul = 0.0;
+          int si = (int)(nd0 - 10.0 * Sig_nd);
+          do
+            {
+	      Skellam_cumul += genie::utils::math::Skellam(np0, nn0, si);
+	      si++;
+            }while(Skellam_cumul < u1);
+
+          double nd = si - 1.0;
+	  
 	  if (pdgc==kPdgKP)   // special for KP
 	    { if (ns==2) nd=0;
 	      if (ns>2) nd=1; }

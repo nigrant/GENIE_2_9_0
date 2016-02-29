@@ -1,3 +1,4 @@
+
 //____________________________________________________________________________
 /*
  Copyright (c) 2003-2015, GENIE Neutrino MC Generator Collaboration
@@ -12,6 +13,9 @@
 
 	 Aaron Meyer <asm58 \at pitt.edu>
 	 Pittsburgh University
+
+         Nick Grant <n.grant.3@warwick.ac.uk>
+         University of Warwick
 
  For documentation see the corresponding header file.
 
@@ -31,9 +35,15 @@
    Added common utility functions used by both hA and hN mode. Updated
    MeanFreePath to separate proton and neutron cross sections. Added general
    utility functions.
+ @ Feb 26, 2016 - NG
+   Added methods for reweighting the number of nucleons ejected when a pion 
+   or kaon is absorbed in a FSI: a method to make splines for weight 
+   calculation, a method to calculate the average of weights, and methods to 
+   get ns, nd and the number of pi or K absorbed.
 */
 //____________________________________________________________________________
 
+#include <TFile.h>
 #include <TLorentzVector.h>
 #include <TMath.h>
 
@@ -51,6 +61,8 @@
 #include "Messenger/Messenger.h"
 #include "Numerical/RandomGen.h"
 #include "Numerical/Spline.h"
+#include "Ntuple/NtpMCTreeHeader.h"
+#include "Ntuple/NtpMCEventRecord.h"
 #include "PDG/PDGLibrary.h"
 #include "PDG/PDGUtils.h"
 #include "PDG/PDGCodes.h"
@@ -1790,4 +1802,391 @@ bool genie::utils::intranuke::PhaseSpaceDecay(
 
   return true;
 }
+//____________________________________________________________________________
+double genie::utils::intranuke::GetNs(const EventRecord & event)
+{
+  int np_eject = 0; 
+  int nn_eject = 0;
+  int pdgCode;
+
+  for(int i=0; i<event.GetEntries(); i++) 
+    {
+      GHepParticle * particle = event.Particle(i);
+      pdgCode = particle->Pdg();
+
+      //look for pion or kaon that is absorbed in final-state interaction    
+      if((pdgCode == kPdgPiP || pdgCode == kPdgPiM || pdgCode == kPdgPi0 || pdgCode == kPdgKP || pdgCode == kPdgKM) 
+         && particle->Status() == 14 && particle->RescatterCode() == 5)
+        {
+          np_eject = 0;
+          nn_eject = 0;
+
+          int daughter1 = particle->FirstDaughter();
+
+	  if(abs(event.Particle(daughter1)->Pdg()) == 2000000300 && event.Particle(daughter1)->Status() == 16)
+	    {
+	      for(int j=event.Particle(daughter1)->FirstDaughter(); j<=event.Particle(daughter1)->LastDaughter(); j++)
+		{
+		  GHepParticle * absDaughter = event.Particle(j);
+		  if(absDaughter->Status() == 1)
+                    {
+                      if(abs(absDaughter->Pdg()) == 2212)
+                        np_eject++;
+                      if(abs(absDaughter->Pdg()) == 2112)
+                        nn_eject++;
+                    }
+		}
+	    }//end of if(abs(event.Particle(daughter1)->Pdg()) == 2000000300 && event.Particle(daughter1)->Status() == 16) 
+
+          if(event.Particle(daughter1)->Status() == 3)
+            {
+              if(event.Particle(daughter1)->FirstDaughter() > 0)
+                {
+                  for(int j=event.Particle(daughter1)->FirstDaughter(); j<=event.Particle(daughter1)->LastDaughter(); j++)
+                    {
+                      GHepParticle * absDaughter = event.Particle(j);
+
+                      if(absDaughter->Status() == 1)
+                        {
+                          if(abs(absDaughter->Pdg()) == 2212)
+                            np_eject++;
+                          if(abs(absDaughter->Pdg()) == 2112)
+                            nn_eject++;
+                        }
+                    }
+                }
+            }//end of if(event.Particle(daughter1)->Status() == 3)
+          else if(event.Particle(daughter1)->Status() == 1)
+            {
+              for(int j=particle->FirstDaughter(); j<=particle->LastDaughter(); j++)
+                {
+                  GHepParticle * absDaughter = event.Particle(j);
+
+                  if(absDaughter->Status() == 1)
+                    {
+                      if(abs(absDaughter->Pdg()) == 2212)
+                        np_eject++;
+                      if(abs(absDaughter->Pdg()) == 2112)
+                        nn_eject++;
+                    }
+                }
+            }//end of else if(event.Particle(daughter)->Status() == 1)
+        }
+    }
+
+  return (double)(np_eject + nn_eject);
+
+}
+//____________________________________________________________________________
+double genie::utils::intranuke::GetNd(const EventRecord & event)
+{
+  int np_eject = 0; 
+  int nn_eject = 0;
+  int pdgCode;
+
+  for(int i=0; i<event.GetEntries(); i++) 
+    {
+      GHepParticle * particle = event.Particle(i);
+      pdgCode = particle->Pdg();
+
+      //look for pion or kaon that is absorbed in final-state interaction    
+      if((pdgCode == kPdgPiP || pdgCode == kPdgPiM || pdgCode == kPdgPi0 || pdgCode == kPdgKP || pdgCode == kPdgKM) 
+         && particle->Status() == 14 && particle->RescatterCode() == 5)
+        {
+          np_eject = 0;
+          nn_eject = 0;
+
+          int daughter1 = particle->FirstDaughter();
+
+	  if(abs(event.Particle(daughter1)->Pdg()) == 2000000300 && event.Particle(daughter1)->Status() == 16)
+            {
+              for(int j=event.Particle(daughter1)->FirstDaughter(); j<=event.Particle(daughter1)->LastDaughter(); j++)
+                {
+                  GHepParticle * absDaughter = event.Particle(j);
+                  if(absDaughter->Status() == 1)
+                    {
+                      if(abs(absDaughter->Pdg()) == 2212)
+                        np_eject++;
+                      if(abs(absDaughter->Pdg()) == 2112)
+                        nn_eject++;
+                    }
+                }
+            }//end of if(abs(event.Particle(daughter1)->Pdg()) == 2000000300 && event.Particle(daughter1)->Status() == 16)
+
+          if(event.Particle(daughter1)->Status() == 3)
+            {
+              if(event.Particle(daughter1)->FirstDaughter() > 0)
+                {
+                  for(int j=event.Particle(daughter1)->FirstDaughter(); j<=event.Particle(daughter1)->LastDaughter(); j++)
+                    {
+                      GHepParticle * absDaughter = event.Particle(j);
+                      if(absDaughter->Status() == 1)
+                        {
+                          if(abs(absDaughter->Pdg()) == 2212)
+                            np_eject++;
+                          if(abs(absDaughter->Pdg()) == 2112)
+                            nn_eject++;
+                        }
+                    }
+                }
+            }//end of if(event.Particle(daughter1)->Status() == 3)
+          else if(event.Particle(daughter1)->Status() == 1)
+            {
+              for(int j=particle->FirstDaughter(); j<=particle->LastDaughter(); j++)
+                {
+                  GHepParticle * absDaughter = event.Particle(j);
+                  if(absDaughter->Status() == 1)
+                    {
+                      if(abs(absDaughter->Pdg()) == 2212)
+                        np_eject++;
+                      if(abs(absDaughter->Pdg()) == 2112)
+                        nn_eject++;
+                    }
+                }
+            }//end of else if(event.Particle(daughter)->Status() == 1)
+        }
+    }
+
+  return (double)(np_eject - nn_eject);
+
+}
+//____________________________________________________________________________
+int genie::utils::intranuke::GetNPiKAbs(const EventRecord & event)
+{
+  int nAbs = 0;
+  int pdgCode;
+
+  for(int i=0; i<event.GetEntries(); i++) 
+    {
+      GHepParticle * particle = event.Particle(i);
+      pdgCode = particle->Pdg();
+
+      //look for pion or kaon that is absorbed in final-state interaction    
+      if((pdgCode == kPdgPiP || pdgCode == kPdgPiM || pdgCode == kPdgPi0 || pdgCode == kPdgKP || pdgCode == kPdgKM) 
+         && particle->Status() == 14 && particle->RescatterCode() == 5)
+        {
+          nAbs++;
+        }
+    }
+
+  return nAbs;
+}
+//____________________________________________________________________________
+void genie::utils::intranuke::MakePiKAbsSplines(string gOptInpFilename, int nevents, double ns_tweak, double nd_tweak)  
+{
+
+  LOG("INukeUtils", pNOTICE) << "Writing splines for reweigthing ns and nd ...... ";
+
+  TFile infile(gOptInpFilename.c_str(),"READ"); 
+
+  TTree *tree = dynamic_cast <TTree *>           ( infile.Get("gtree")  );
+  NtpMCTreeHeader *thdr = dynamic_cast <NtpMCTreeHeader *> ( infile.Get("header") );   
+
+  if(!tree)
+    {
+      LOG("INukeUtils", pDEBUG)
+        << "TTree not found in input file "<<gOptInpFilename.c_str(); 
+      return; 
+    }
+
+  LOG("INukeUtils", pNOTICE) << "Input tree header: " << *thdr;
+
+  NtpMCEventRecord * mcrec = 0; 
+  tree->SetBranchAddress("gmcrec", &mcrec);  
+
+  int nev = TMath::Min(nevents, (int)tree->GetEntries());
+
+  LOG("INukeUtils", pNOTICE) << "Will process " << nev << " events";
+
+  const int npoints = 41;
+
+  double nX[npoints];
+  double nsTwkX[npoints];
+  double ndTwkX[npoints];
+
+  for(int i=0; i<npoints; i++)
+    {
+      if(npoints%2 == 0)
+	{
+	nX[i] = i - npoints / 2;
+	nsTwkX[i] = i - npoints / 2 + ns_tweak;
+	ndTwkX[i] = i - npoints / 2 + nd_tweak;
+	}
+      else
+	{
+	nX[i] = i - (npoints - 1) / 2;
+	nsTwkX[i] = i - (npoints - 1) / 2 + ns_tweak;
+        ndTwkX[i] = i - (npoints - 1) / 2 + nd_tweak;
+	}
+    }
+
+  double ns, nd;
+  int nsbin, ndbin;
+  double nsDist[npoints] = {0};
+  double ndDist[npoints] = {0};
+
+  for(int i = 0; i < nev; i++)
+    {
+      tree->GetEntry(i);
+
+      EventRecord & event = *(mcrec->event);
+
+      ns = genie::utils::intranuke::GetNs(event);
+      nd = genie::utils::intranuke::GetNd(event);
+
+      //Check whether ns and nd are within range of arrays
+      if(ns < -((double)(npoints - 1) / 2.0 + 0.1) || ns > ((double)(npoints - 1) / 2.0 - 0.1))
+        continue;
+      if(nd < -((double)(npoints - 1) / 2.0 + 0.1) || nd > ((double)(npoints - 1) / 2.0 - 0.1))
+        continue;
+       
+      if(npoints%2 == 0)
+	{
+        nsbin = (int)(ns + (double)npoints / 2.0);
+	ndbin = (int)(nd + (double)npoints / 2.0);
+	}
+      else
+	{
+        nsbin = (int)(ns + (double)(npoints - 1) / 2.0);
+	ndbin = (int)(nd + (double)(npoints - 1) / 2.0);
+	}
+
+      if(genie::utils::intranuke::GetNPiKAbs(event) == 1)      
+	{
+        nsDist[nsbin] += 1.0;
+	ndDist[ndbin] += 1.0;
+	}
+    }
+
+  TGraph *nsGraph = new TGraph(npoints, nX, nsDist);
+  TGraph *nsTwkGraph = new TGraph(npoints, nsTwkX, nsDist);
+  TGraph *ndGraph = new TGraph(npoints, nX, ndDist);
+  TGraph *ndTwkGraph = new TGraph(npoints, ndTwkX, ndDist);
+  
+  TSpline3 *nsSpl = new TSpline3("nsSpl", nsGraph);
+  TSpline3 *nsTwkSpl = new TSpline3("nsTwkSpl", nsTwkGraph);  
+  TSpline3 *ndSpl = new TSpline3("ndSpl", ndGraph);
+  TSpline3 *ndTwkSpl = new TSpline3("ndTwkSpl", ndTwkGraph);
+
+  TFile outfile("PiKAbsSplines.root", "UPDATE");
+  outfile.cd();
+
+  if(fabs(ns_tweak) > 1e-6)
+    {
+    nsGraph->Write("nsGraph");
+    nsSpl->Write("nsSpline");
+    nsTwkSpl->Write("nsSplineTweaked");
+    }
+
+  if(fabs(nd_tweak) > 1e-6)
+    {
+    ndGraph->Write("ndGraph");
+    ndSpl->Write("ndSpline");
+    ndTwkSpl->Write("ndSplineTweaked");
+    }
+
+  outfile.Close();
+
+  infile.Close();
+
+}
+
+//____________________________________________________________________________
+double genie::utils::intranuke::CalcPiKAbsWeightMean(string gOptInpFilename, int nevents, std::map<double, double> &ns_zero_events, std::map<double, double> &nd_zero_events)
+{
+
+  LOG("INukeUtils", pNOTICE) << "Calculating mean of weights with both ns and nd being tweaked ....";
+
+  TFile infile(gOptInpFilename.c_str(),"READ");
+
+  TTree *tree = dynamic_cast <TTree *>           ( infile.Get("gtree")  );
+  NtpMCTreeHeader *thdr = dynamic_cast <NtpMCTreeHeader *> ( infile.Get("header") );
+
+  if(!tree)
+    {
+      LOG("INukeUtils", pDEBUG)
+        << "TTree not found in input file "<<gOptInpFilename.c_str();
+      return 0;
+    }
+
+  LOG("INukeUtils", pNOTICE) << "Input tree header: " << *thdr;
+
+  NtpMCEventRecord * mcrec = 0;
+  tree->SetBranchAddress("gmcrec", &mcrec);
+
+  int nev = TMath::Min(nevents, (int)tree->GetEntries());
+
+  LOG("INukeUtils", pNOTICE) << "Will process " << nev << " events";
+
+  TFile splineFile("PiKAbsSplines.root", "READ");
+  splineFile.cd();
+
+  TSpline3 *nsSpl = (TSpline3*)splineFile.Get("nsSpline");
+  TSpline3 *nsSplTwk = (TSpline3*)splineFile.Get("nsSplineTweaked");
+  TSpline3 *ndSpl = (TSpline3*)splineFile.Get("ndSpline");
+  TSpline3 *ndSplTwk = (TSpline3*)splineFile.Get("ndSplineTweaked");
+
+  int nPiKAbsEvents = 0; 
+
+  double weight_mean = 0.0;
+
+  double ns, nd, ns_weight, nd_weight;
+
+  std::map<double, double>::iterator weightmapit;
+
+  for(int i = 0; i < nev; i++)
+    {
+      tree->GetEntry(i);
+
+      EventRecord & event = *(mcrec->event);
+
+      int nPiKAbs = genie::utils::intranuke::GetNPiKAbs(event);
+
+      if(nPiKAbs == 1)
+	{
+	  nPiKAbsEvents++;
+
+          ns = genie::utils::intranuke::GetNs(event);
+          nd = genie::utils::intranuke::GetNd(event);
+
+          if(nsSplTwk->Eval(ns) < 0.01 || nsSpl->Eval(ns) < 0.01)
+	    ns_weight = 0.0;
+          else
+	    ns_weight = nsSplTwk->Eval(ns) / nsSpl->Eval(ns);
+      
+          if(ndSplTwk->Eval(nd) < 0.01 || ndSpl->Eval(nd) < 0.01)
+	    nd_weight = 0.0;
+          else
+            nd_weight = ndSplTwk->Eval(nd) / ndSpl->Eval(nd);
+
+	  weight_mean += ns_weight * nd_weight;
+	}
+
+    }
+
+  //add one fake "event" to mean for any value of ns with zero events that is within the range of values with non-zero events     
+  //value of nd is not defined for this "event", assume nd weight is 1.0
+  for(weightmapit=ns_zero_events.begin(); weightmapit!=ns_zero_events.end(); ++weightmapit)
+    {
+      nPiKAbsEvents++;
+      weight_mean += weightmapit->second;
+    }
+
+  //add one fake "event" to mean for any value of nd with zero events that is within the range of values with non-zero events
+  //value of ns is not defined for this "event", assume nd weight is 1.0
+  for(weightmapit=nd_zero_events.begin(); weightmapit!=nd_zero_events.end(); ++weightmapit)
+    {
+      nPiKAbsEvents++;
+      weight_mean += weightmapit->second;
+    }
+
+  weight_mean /= nPiKAbsEvents;
+
+  splineFile.Close();
+
+  infile.Close();
+
+  return weight_mean;
+}
+//____________________________________________________________________________
 

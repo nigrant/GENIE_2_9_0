@@ -30,6 +30,7 @@
 #include "HadronTransport/INukeHadroFates.h"
 #include "HadronTransport/INukeMode.h"
 #include "Nuclear/NuclearModelI.h"
+#include "EVGCore/EventRecord.h"
 
 class TLorentzVector;
 
@@ -107,6 +108,23 @@ namespace intranuke
     GHepRecord* ev, GHepParticle* p, const PDGCodeList & pdgv, TLorentzVector &RemnP4,
     double NucRmvE, EINukeMode mode=kIMdHA);
 
+  //Get ns (sum of number of protons and number of neutrons ejected when a pion or kaon
+  //is absorbed in a FSI)
+  double GetNs(const EventRecord & event);
+
+  //Get nd (difference between number of protons and number of neutrons ejected when a
+  //pion or kaon is absorbed in a FSI) 
+  double GetNd(const EventRecord & event);
+
+  //Get number of nucleons ejected when a pion or kaon is absorbed in a FSI 
+  int GetNPiKAbs(const EventRecord & event);
+
+  //Make TGraph of distribution of ns and/or nd and fit it with TSpline3
+  void MakePiKAbsSplines(string gOptInpFilename, int nevents, double ns_tweak, double nd_tweak);
+
+  //Calculate mean of weights when both ns and nd are tweaked
+  double CalcPiKAbsWeightMean(string gOptInpFilename, int nevents, std::map<double, double> &ns_zero_events, std::map<double, double> &nd_zero_events);
+  
 }      // intranuke namespace
 }      // utils     namespace
 }      // genie     namespace

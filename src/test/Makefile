@@ -21,14 +21,14 @@ LIBRARIES  := $(GENIE_LIBS) $(LIBRARIES) $(CERN_LIBRARIES)
 TGT =	gtestAlgorithms 	 \
 	gtestBLI2DUnifGrid       \
 	gtestCmdLnArg		 \
- 	gtestConfigPool		 \
- 	gtestDecay		 \
- 	gtestDISSF		 \
- 	gtestElFormFactors	 \
- 	gtestEventLoop 		 \
- 	gtestFluxAstro 		 \
- 	gtestFluxAtmo 		 \
- 	gtestFluxSimple 	 \
+	gtestConfigPool		 \
+	gtestDecay		 \
+	gtestDISSF		 \
+	gtestElFormFactors	 \
+	gtestEventLoop 		 \
+	gtestFluxAstro 		 \
+	gtestFluxAtmo 		 \
+	gtestFluxSimple 	 \
 	gtestFGPauliBlockSuppr   \
         gtestGiBUUData           \
 	gtestHadronization	 \
@@ -40,6 +40,7 @@ TGT =	gtestAlgorithms 	 \
 	gtestROOTGeometry	 \
 	gtestFermiP		 \
 	gtestRewght		 \
+	gtestRewghtPiKAbs        \
 	gtestRegistry		 \
 	gtestInteraction	 \
 	gtestResonances		 \
@@ -159,7 +160,15 @@ ifeq ($(strip $(GOPT_ENABLE_RWGHT)),YES)
 else
 	@echo "You need to enable event reweighting first!"
 endif
-                   
+
+gtestRewghtPiKAbs: FORCE
+ifeq ($(strip $(GOPT_ENABLE_RWGHT)),YES)
+	$(CXX) $(CXXFLAGS) -c gtestRewghtPiKAbs.cxx $(INCLUDES)
+	$(LD) $(LDFLAGS) gtestRewghtPiKAbs.o $(LIBRARIES) -o $(GENIE_BIN_PATH)/gtestRewghtPiKAbs
+else
+	@echo "You need to enable event reweighting first!"
+endif
+
 gtestRegistry: FORCE
 	$(CXX) $(CXXFLAGS) -c gtestRegistry.cxx $(INCLUDES)
 	$(LD) $(LDFLAGS) gtestRegistry.o $(LIBRARIES) -o $(GENIE_BIN_PATH)/gtestRegistry
@@ -220,6 +229,7 @@ clean: FORCE
 	$(RM) $(GENIE_BIN_PATH)/gtestPREM		
 	$(RM) $(GENIE_BIN_PATH)/gtestFermiP		
 	$(RM) $(GENIE_BIN_PATH)/gtestRewght		
+	$(RM) $(GENIE_BIN_PATH)/gtestRewghtPiKAbs
 	$(RM) $(GENIE_BIN_PATH)/gtestRegistry		
 	$(RM) $(GENIE_BIN_PATH)/gtestInteraction	
 	$(RM) $(GENIE_BIN_PATH)/gtestResonances		
@@ -253,7 +263,8 @@ distclean: FORCE
 	$(RM) $(GENIE_BIN_INSTALLATION_PATH)/gtestPDFLIB		
 	$(RM) $(GENIE_BIN_INSTALLATION_PATH)/gtestPREM		
 	$(RM) $(GENIE_BIN_INSTALLATION_PATH)/gtestFermiP		
-	$(RM) $(GENIE_BIN_INSTALLATION_PATH)/gtestRewght		
+	$(RM) $(GENIE_BIN_INSTALLATION_PATH)/gtestRewght
+	$(RM) $(GENIE_BIN_INSTALLATION_PATH)/gtestRewghtPiKAbs		
 	$(RM) $(GENIE_BIN_INSTALLATION_PATH)/gtestRegistry		
 	$(RM) $(GENIE_BIN_INSTALLATION_PATH)/gtestInteraction	
 	$(RM) $(GENIE_BIN_INSTALLATION_PATH)/gtestResonances		
